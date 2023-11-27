@@ -24,6 +24,9 @@ void updateParticlesCPU(float deltaTime) {
 
 int main() {
 
+    float res = (1.00467 - 0.756512)/2.0;
+    std::cout<<"RESULT: "<<res<<'\n';
+
     bool isParticleGpuOn = false;
     bool isParticleCPUOn = true;
 
