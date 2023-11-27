@@ -48,7 +48,7 @@ void updateParitclesGPU(float deltatime) {
 
     float elapsedTime;
     cudaEventElapsedTime(&elapsedTime, start, stop);
-    std::cout << "Elapsed Time: " << elapsedTime << " ms" << std::endl;
+    std::cout << "Elapsed Time on GPU: " << elapsedTime << " ms" << std::endl;
 
 }
 
