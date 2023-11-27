@@ -1,14 +1,14 @@
-#include <iostream>
-
 #include "test.h"
 
-// Kernel definition
-__global__ void VecAdd(float* A, float* B, float* C)
-{
-    int i = threadIdx.x;
-    C[i] = A[i] + B[i];
-}
+__global__ void updateParticlesKernel(Particle *particles, float screenWidth, float screenHeight) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
 
-void performTest(float* a, float* b, float* res, int size){
-    VecAdd<<<1, size>>>(a, b, res);
+    particles[i].position.x += particles[i].speed.x;
+    particles[i].position.y += particles[i].speed.y;
+
+    // Check screen boundaries
+    if (particles[i].position.x > screenWidth) particles[i].position.x = 0;
+    if (particles[i].position.x < 0) particles[i].position.x = screenWidth;
+    if (particles[i].position.y > screenHeight) particles[i].position.y = 0;
+    if (particles[i].position.y < 0) particles[i].position.y = screenHeight;
 }

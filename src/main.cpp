@@ -1,70 +1,83 @@
-#include <iostream>
-#include <cuda_runtime.h>
-#include "raylib.h"
 #include "test.h"
 
-int main(){
-    // Initialization
-    //--------------------------------------------------------------------------------------
-    const int screenWidth = 800;
-    const int screenHeight = 450;
+#define MAX_PARTICLES 50000
+#define MAX_SPEED 5.0f
 
-    int deviceCount;
-    cudaGetDeviceCount(&deviceCount);
+constexpr float screenWidth = 1600.0f;
+constexpr float screenHeight = 900.0f;
 
 
+Particle particles[MAX_PARTICLES];
 
-    std::cout<<deviceCount<<'\n';
+void updateParticlesCPU() {
+    for (int i = 0; i < MAX_PARTICLES; i++) {
+        particles[i].position.x += particles[i].speed.x;
+        particles[i].position.y += particles[i].speed.y;
 
-    char numberAsChar = ('0'+deviceCount);
-    char* text = new char[2];
-    text[0]= numberAsChar;
-    text[1]= '\0';
+        if (particles[i].position.x > screenWidth)
+            particles[i].position.x = 0;
+
+        if (particles[i].position.x < 0)
+            particles[i].position.x = screenWidth;
+
+        if (particles[i].position.y > screenHeight)
+            particles[i].position.y = 0;
+
+        if (particles[i].position.y < 0)
+            particles[i].position.y = screenHeight;
+    }
+}
 
 
-    float* vecA = new float[3];
-    float* vecB = new float[3];
-    float *d_x, *d_y;
+void updateParitclesGPU() {
+    Particle *d_particles;
 
-    for(size_t i =0; i<3;i++){
-        vecA[i] = (0.1*(float)i);
-        vecB[i] = vecA[i];
+    cudaMalloc((void**)&d_particles, MAX_PARTICLES * sizeof(Particle));
+    cudaMemcpy(d_particles, particles, MAX_PARTICLES * sizeof(Particle), cudaMemcpyHostToDevice);
+
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (MAX_PARTICLES + threadsPerBlock - 1) / threadsPerBlock;
+
+    updateParticlesKernel<<blocksPerGrid, threadsPerBlock>>>(d_particles, screenWidth, screenHeight);
+
+    cudaMemcpy(particles, d_particles, MAX_PARTICLES * sizeof(Particle), cudaMemcpyDeviceToHost);
+    cudaFree(d_particles);
+}
+
+int main() {
+
+    InitWindow((int)screenWidth, (int)screenHeight, "Particle Simulation");
+
+    for (int i = 0; i < MAX_PARTICLES; i++) {
+        particles[i].position = (Vector2){ float(GetRandomValue(0, screenWidth)), float(GetRandomValue(0, screenHeight)) };
+        particles[i].speed = (Vector2){ float(GetRandomValue(-MAX_SPEED, MAX_SPEED)), float(GetRandomValue(-MAX_SPEED, MAX_SPEED))};
+        particles[i].color = (Color){
+                (unsigned char)GetRandomValue(50, 255),
+                (unsigned char)GetRandomValue(50, 255),
+                (unsigned char)GetRandomValue(50, 255),
+                255
+        };
+
     }
 
+    SetTargetFPS(60);
 
-    //performTest();
-
-    InitWindow(screenWidth, screenHeight, "raylib [core] example - basic window");
-
-    SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
-    //--------------------------------------------------------------------------------------
-
-    // Main game loop
-    while (!WindowShouldClose())    // Detect window close button or ESC key
-    {
-        // Update
-        //----------------------------------------------------------------------------------
-        // TODO: Update your variables here
-        //----------------------------------------------------------------------------------
-
-        // Draw
-        //----------------------------------------------------------------------------------
+    while (!WindowShouldClose()) {
         BeginDrawing();
 
         ClearBackground(RAYWHITE);
 
-        DrawText(text, screenWidth/2, 200, 100, BLUE);
+        updateParticlesCPU();
+
+        for (int i = 0; i < MAX_PARTICLES; i++) {
+
+            DrawCircle(particles[i].position.x, particles[i].position.y, 3, particles[i].color);
+        }
 
         EndDrawing();
-        //----------------------------------------------------------------------------------
     }
 
-    // De-Initialization
-    //--------------------------------------------------------------------------------------
-    CloseWindow();        // Close window and OpenGL context
-    //--------------------------------------------------------------------------------------
-
-    delete[] text;
+    CloseWindow();
 
     return 0;
 }
