@@ -2,9 +2,13 @@
 #define CUDA_PARTICLE_SIMULATION_TEST_H
 
 #include "raylib.h"
-#include "cuda_runtime.h"
-#include "test.h"
+#include <iostream>
 
+#define MAX_PARTICLES 50000
+#define MAX_SPEED 5.0f
+
+#define SCREEN_WIDTH 1600.0f
+#define SCREEN_HEIGHT 900.0f
 
 struct Particle{
     Vector2 position;
@@ -12,6 +16,8 @@ struct Particle{
     Color color;
 };
 
-__global__ void updateParticlesKernel(Particle *particles, float screenWidth, float screenHeight);
+extern Particle particles[MAX_PARTICLES];
 
-#endif //CUDA_PARTICLE_SIMULATION_TEST_H
+void updateParitclesGPU(float deltatime);
+
+#endif

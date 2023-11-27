@@ -1,55 +1,36 @@
 #include "test.h"
+#include <cmath>
+#include <chrono>
+#include <algorithm>
 
-#define MAX_PARTICLES 50000
-#define MAX_SPEED 5.0f
+void updateParticlesCPU(float deltaTime) {
 
-constexpr float screenWidth = 1600.0f;
-constexpr float screenHeight = 900.0f;
-
-
-Particle particles[MAX_PARTICLES];
-
-void updateParticlesCPU() {
     for (int i = 0; i < MAX_PARTICLES; i++) {
-        particles[i].position.x += particles[i].speed.x;
-        particles[i].position.y += particles[i].speed.y;
+        particles[i].position.x += particles[i].speed.x * deltaTime;
+        particles[i].position.y += particles[i].speed.y * deltaTime;
 
-        if (particles[i].position.x > screenWidth)
-            particles[i].position.x = 0;
+        particles[i].position.x = std::clamp(particles[i].position.x, 0.0f, (float)(SCREEN_WIDTH));
+        particles[i].position.y = std::clamp(particles[i].position.y, 0.0f, (float)(SCREEN_HEIGHT));
+        float angleChange = 1.0f;
+        float angle = std::atan2(particles[i].speed.y, particles[i].speed.x) + angleChange;
+        particles[i].speed.x = std::cos(angle);
+        particles[i].speed.y = std::sin(angle);
 
-        if (particles[i].position.x < 0)
-            particles[i].position.x = screenWidth;
-
-        if (particles[i].position.y > screenHeight)
-            particles[i].position.y = 0;
-
-        if (particles[i].position.y < 0)
-            particles[i].position.y = screenHeight;
+        particles[i].speed.x += 1000.0f * std::cos(angle) * deltaTime;
+        particles[i].speed.y += 1000.0f * std::sin(angle) * deltaTime;
     }
 }
 
 
-void updateParitclesGPU() {
-    Particle *d_particles;
-
-    cudaMalloc((void**)&d_particles, MAX_PARTICLES * sizeof(Particle));
-    cudaMemcpy(d_particles, particles, MAX_PARTICLES * sizeof(Particle), cudaMemcpyHostToDevice);
-
-    int threadsPerBlock = 256;
-    int blocksPerGrid = (MAX_PARTICLES + threadsPerBlock - 1) / threadsPerBlock;
-
-    updateParticlesKernel<<blocksPerGrid, threadsPerBlock>>>(d_particles, screenWidth, screenHeight);
-
-    cudaMemcpy(particles, d_particles, MAX_PARTICLES * sizeof(Particle), cudaMemcpyDeviceToHost);
-    cudaFree(d_particles);
-}
-
 int main() {
 
-    InitWindow((int)screenWidth, (int)screenHeight, "Particle Simulation");
+    bool isParticleGpuOn = false;
+    bool isParticleCPUOn = true;
+
+    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT,"Particle Simulation");
 
     for (int i = 0; i < MAX_PARTICLES; i++) {
-        particles[i].position = (Vector2){ float(GetRandomValue(0, screenWidth)), float(GetRandomValue(0, screenHeight)) };
+        particles[i].position = (Vector2){ float(GetRandomValue(0, SCREEN_WIDTH)), float(GetRandomValue(0, SCREEN_HEIGHT)) };
         particles[i].speed = (Vector2){ float(GetRandomValue(-MAX_SPEED, MAX_SPEED)), float(GetRandomValue(-MAX_SPEED, MAX_SPEED))};
         particles[i].color = (Color){
                 (unsigned char)GetRandomValue(50, 255),
@@ -60,19 +41,60 @@ int main() {
 
     }
 
-    SetTargetFPS(60);
-
     while (!WindowShouldClose()) {
+
+        float deltatime  = GetFrameTime();
+
         BeginDrawing();
 
         ClearBackground(RAYWHITE);
 
-        updateParticlesCPU();
+
+        if(IsKeyPressed(KEY_G)){
+            isParticleGpuOn = true;
+            isParticleCPUOn = false;
+        }
+        if(IsKeyPressed(KEY_C)) {
+            isParticleGpuOn = false;
+            isParticleCPUOn = true;
+        }
+
+
+        if(isParticleCPUOn){
+            std::chrono::high_resolution_clock::time_point start_time, end_time;
+
+            start_time = std::chrono::high_resolution_clock::now();
+
+            updateParticlesCPU(deltatime);
+
+            end_time = std::chrono::high_resolution_clock::now();
+
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+
+            std::cout << "Elapsed Time on CPU: " << duration.count() << " ms" << std::endl;
+        }
+
+
+        if(isParticleGpuOn){
+            updateParitclesGPU(deltatime);
+
+        }
+
+        std::chrono::high_resolution_clock::time_point start_time, end_time;
+
+        start_time = std::chrono::high_resolution_clock::now();
 
         for (int i = 0; i < MAX_PARTICLES; i++) {
 
             DrawCircle(particles[i].position.x, particles[i].position.y, 3, particles[i].color);
         }
+
+        end_time = std::chrono::high_resolution_clock::now();
+
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+
+        std::cout << "Rendering Time: " << duration.count() << " ms" << std::endl;
+
 
         EndDrawing();
     }
