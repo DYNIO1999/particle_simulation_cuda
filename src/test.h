@@ -16,7 +16,7 @@ struct Particle{
     Color color;
 };
 
-extern Particle particles[MAX_PARTICLES];
+Particle particles[MAX_PARTICLES];
 
 void updateParitclesGPU(float deltatime);
 
